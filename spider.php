@@ -2,68 +2,215 @@
 class siteparser
 {
     var $site = '',
-        $pages_links = array(),
-        $pages = array(),
-        $filename = '',
-        $tmp_filename = '',
-        $download = '';
+        $DBname = '',
+        $DB,
+        $count;
 
-
-    function __construct($site, $date)
+    function __construct($site)
     {
-        $this->site = trim($site, '/');
-        $this->filename = str_replace(array('https://', 'http://', ':', '/'), '', $site) . '_' . $date . '.csv';
-        $this->tmp_filename =  $this->filename . '.tmp';
-        $this->download = '/spider_' . $this->filename;
-        $this->filename = __DIR__ . '/spider_' . $this->filename;
-        $this->tmp_filename = __DIR__ . '/spider_' . $this->tmp_filename;
-        if (file_exists($this->tmp_filename)) {
+        $this->DBname = str_replace(array('https://', 'http://', ':', '/'), '', $site) . '.db';
+        $this->DBname = __DIR__ . '/spider_' . $this->DBname;
+        $this->DB = new SQLite3($this->DBname);
 
-            $links = file($this->tmp_filename);
-            if (is_array($links)) {
-                foreach ($links as $url) {
-                    $url = trim($url);
-                    $this->pages_links[$url] = '-';
-                };
-            };
-        } else {
-            $this->add_url($this->site);
+        /* История сканирования */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT,
+                errors TEXT,
+                todo TEXT,
+                comment TEXT
+            );
+        ';
+
+        /* Таблица хранит url страниц */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS page (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT
+            );
+        ';
+
+        /* Код ответа сайтева на страницу */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS code (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_page INTEGER,
+                responce_code TEXT,
+                date TEXT
+            );
+        ';
+
+        /* Мета теши и тайтл страницы */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS meta (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_page INTEGER,
+                name TEXT,
+                content TEXT,
+                date TEXT
+            );
+        ';
+
+        /* Link canonical, styles, alternate страницы */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS link (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_page INTEGER,
+                rel TEXT,
+                href TEXT,
+                full TEXT,
+                date TEXT
+            );
+        ';
+
+        /* h1-h6 на странице */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS h16 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_page INTEGER,
+                name TEXT,
+                content TEXT,
+                date TEXT
+            );
+        ';
+
+        /* Источники ссылок на страницу */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS source (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_page INTEGER,
+                id_page_source INTEGER,
+                date TEXT
+            );
+        ';
+
+        /* Картинки */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS image (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_page INTEGER,
+                src TEXT,
+                alt TEXT,
+                title TEXT,
+                date TEXT
+            );
+        ';
+
+        /* Ошибки */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS errors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_page INTEGER,
+                error TEXT,
+                date TEXT
+            );
+        ';
+
+        foreach ($querys as $query) {
+            $this->DB->query($query);
         };
+
+        $this->site = trim($site, '/');
+        $query = 'SELECT COUNT(*) as count FROM page';
+        $count = $this->DB->querySingle($query);
+        if ($count == 0) {
+            $this->add_url($this->site);
+        }
+        $this->count = $count;
     }
 
-    function do($start, $count)
+    function do($start, $limit, $date)
     {
         $i = 0;
+        if ($start = 0) {
+            /* Запишем в историю что начали сканирование */
+            $query = 'SELECT COUNT(*) as count FROM history WHERE date="'.$date.'";';
+            $count_history = $this->DB->querySingle($query);
+            if ($count_history == 0) {
+                $query = 'INSERT INTO history (date) VALUES ("'.$date.'")';
+                $this->DB->query($query);
+            };
+        };
 
-        $link_to_parse = array_slice($this->pages_links, $start, $count);
+        $query = 'SELECT page.id as id, page.url as url
+                    FROM page
+                    WHERE
+                        page.id NOT IN (
+                            SELECT id_page FROM code WHERE code.date =="'.$date.'"
+                        )
+                    LIMIT '.$start.', '.$limit;
+        $result = $this->DB->query($query);
 
-        foreach ($link_to_parse as $url => $r) {
+        while ($row = $result->fetchArray()) {
+            $id = $row['id'];
+            $url = $row['url'];
+
             $res = $this->get_contents($url);
 
             if ($res['error'] != '') {
-                $this->pages[$url]['response'] = $res['error'];
-            } else if ($res['header']['reponse_code'] != 200) {
-                $this->pages[$url]['response'] = $res['header']['reponse_code'];
-            } else {
-                $res2 = $this->parse_page($res['content']);
+                $query = 'INSERT INTO errors (id_page, error, date) VALUES (
+                    '.$id.',
+                    "'.$res['error'].'",
+                    "'.$date.'"
+                );';
+                $this->DB->query($query);
+                $query = 'INSERT INTO code (id_page, responce_code, date) VALUES (
+                    '.$id.',
+                    "LOOK ERROR",
+                    "'.$date.'"
+                );';
+                $this->DB->query($query);
 
-                $this->pages[$url] =  array(
-                    'response'          => $res['header']['reponse_code'],
-                    'title'             => $res2['title'],
-                    'description'       => $res2['meta']['description'],
-                    'keywords'          => $res2['meta']['keywords'],
-                    'h1'                => implode(', ', $res2['h1']),
-                    'h2'                => implode(', ', $res2['h2']),
-                    'h3'                => implode(', ', $res2['h3']),
-                    'h4'                => implode(', ', $res2['h4']),
-                    'h5'                => implode(', ', $res2['h5']),
-                    'h6'                => implode(', ', $res2['h6']),
-                );
-                echo '<p>' . $url . ' (new links: '.count($res2['links']).')</p>';
+            } else {
+                $query = 'INSERT INTO code (id_page, responce_code, date) VALUES (
+                    '.$id.',
+                    "'.$res['header']['reponse_code'].'",
+                    "'.$date.'"
+                );';
+                $this->DB->query($query);
+
+                if ($res['header']['reponse_code'] == 200) {
+                    $res2 = $this->parse_page($res['content'], $id);
+
+                    $query = 'INSERT INTO meta (id_page, name, content, date) VALUES (
+                        '.$id.',
+                        "title",
+                        "'.$res2['title'].'",
+                        "'.$date.'"
+                    );';
+                    $this->DB->query($query);
+
+                    foreach ($res2['meta'] as $name=>$content) {
+                        $query = 'INSERT INTO meta (id_page, name, content, date) VALUES (
+                            '.$id.',
+                            "'.$name.'",
+                            "'.$content.'",
+                            "'.$date.'"
+                        );';
+                        $this->DB->query($query);
+                    }
+
+                    $h = 1;
+                    while ($h < 6) {
+                        if (is_array($res2['h'.$h])) {
+                            foreach ($res2['h'.$h] as $hcontent) {
+                                $query = 'INSERT INTO h16 (id_page, name, content, date) VALUES (
+                                    '.$id.',
+                                    "'.'h'.$h.'",
+                                    "'.$hcontent.'",
+                                    "'.$date.'"
+                                );';
+                                $this->DB->query($query);
+                            }
+                        };
+                        $h++;
+                    };
+                    echo '<p>' . $url . ' (new links: '.count($res2['links']).')</p>';
+                }
             };
             $i++;
         };
-        $this->save();
         return $i + $start;
     }
 
@@ -92,7 +239,33 @@ class siteparser
         return array();
     }
 
-    function parse_page($content)
+
+    function getMetaLinks($str)
+    {
+        $pattern = '
+      ~<\s*link\s
+
+      # using rel to $1
+        (?=[^>]*?
+        \b(?:rel)\s*=\s*
+        (?|"\s*([^"]*?)\s*"|\'\s*([^\']*?)\s*\'|
+        ([^"\'>]*?)(?=\s*/?\s*>|\s\w+\s*=))
+      )
+
+      # capture href to $2
+      [^>]*?\bhref\s*=\s*
+        (?|"\s*([^"]*?)\s*"|\'\s*([^\']*?)\s*\'|
+        ([^"\'>]*?)(?=\s*/?\s*>|\s\w+\s*=))
+      [^>]*>
+
+      ~ix';
+
+        if (preg_match_all($pattern, $str, $out))
+            return array_combine($out[1], $out[2]);
+        return array();
+    }
+
+    function parse_page($content, $id_page_source)
     {
         /* title */
         $matches = [];
@@ -110,6 +283,10 @@ class siteparser
         $meta  = $this->getMetaTags($content);
         $result['meta'] = $meta;
 
+        $metalink  = $this->getMetaLinks($content);
+        $result['metalink'] = $metalink;
+        print_r($metalink);
+        die();
         /* h1 - h6 */
 
         $i = 1;
@@ -130,12 +307,24 @@ class siteparser
         };
 
 
-
+        $result['links'] = array();
         if (preg_match_all("/<a\s[^>]*href=(\"??)([^\" >]*?)\\1[^>]*>(.*)<\/a>/siU", $content, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $match) {
-                if ($this->add_url($match[2])) {
-                    $result['links'][] = $match[2];
+                $url = $this->prepare_url($match[2]);
+                if ($this->add_url($url)) {
+                    $result['links'][] = $url;
                 };
+                $query = 'SELECT id FROM page WHERE url ="'.$url.'";';
+                $id_page = $this->DB->querySingle($query);
+
+                if (is_numeric($id_page)) {
+                    $query = 'INSERT INTO source (id_page, id_page_source, date) VALUES (
+                        '.$id_page.',
+                        '.$id_page_source.',
+                        "'.$date.'"
+                    );';
+                    $this->DB->query($query);
+                }
                 // $match[2] = link address
                 // $match[3] = link text
             }
@@ -180,79 +369,64 @@ class siteparser
         return $head;
     }
 
+    function prepare_url($url) {
+        list($url, $hashtag) = explode('#', $url);
+        if ($url != '') {
+
+            $need_add_site = false;
+            if ((substr($url, 0, 6) != 'https:') &&
+                (substr($url, 0, 5) != 'http:') &&
+                (substr($url, 0, 2) != '//')
+            ) {
+                $need_add_site = true;
+            };
+
+            if ($need_add_site) {
+                if (substr($url, 0, 1) != '/') {
+                    $url = '/' . $url;
+                };
+                $url = $this->site . $url;
+            };
+        };
+        return $url;
+    }
+
     function add_url($url)
     {
         $need_add = false;
-        if (!isset($this->pages_links[$url])) {
 
-            if ((substr($url, 0, 4) != 'tel:') &&
-                (substr($url, 0, 7) != 'mailto:')
-            ) {
-                list($url, $hashtag) = explode('#', $url);
-
-                if ($url != '') {
-
-                    $need_add_site = false;
-                    if ((substr($url, 0, 6) != 'https:') &&
-                        (substr($url, 0, 5) != 'http:') &&
-                        (substr($url, 0, 2) != '//')
-                    ) {
-                        $need_add_site = true;
-                    };
-
-                    if ($need_add_site) {
-                        if (substr($url, 0, 1) != '/') {
-                            $url = '/' . $url;
-                        };
-                        $url = $this->site . $url;
-                    };
-
-                    if (strpos($url, $this->site) !== false) {
-                        if ($this->site.'/' != $url) {
-                            if (!isset($this->pages_links[$url])) {
-                                $need_add = true;
-                            };
-                        };
+        if ((substr($url, 0, 4) != 'tel:') &&
+            (substr($url, 0, 7) != 'mailto:')
+        ) {
+            if ($url != '') {
+                if (strpos($url, $this->site) !== false) {
+                    if ($this->site.'/' != $url) {
+                        $query = 'SELECT COUNT(*) as count FROM page WHERE url = "'.$url.'"';
+                        $count = $this->DB->querySingle($query);
+                        if ($count == 0) {
+                            $need_add = true;
+                        }
                     };
                 };
             };
         };
 
         if ($need_add) {
-            $this->pages_links[$url] = '-';
-            file_put_contents($this->tmp_filename, $url . "\n", FILE_APPEND);
+            $query = 'INSERT INTO page (url) VALUES ("'.$url.'");';
+            $this->DB->query($query);
+            $ID = $this->DB->lastInsertRowID();
+            return $url;
         };
         return $need_add;
     }
 
-    function save()
-    {
-        foreach ($this->pages as $url => $value) {
-            if (!file_exists($this->filename)) {
-                $str = 'URL;' .
-                    'response' . ';' .
-                    'title' . ';' .
-                    'description' . ';' .
-                    'keywords' . ';' .
-                    'h1' . ';' .
-                    'h2' . ';' .
-                    'h3' . ';' .
-                    'h4' . ';' .
-                    'h5' . ';' .
-                    'h6' . ';';
-                file_put_contents($this->filename, $str . "\n", FILE_APPEND);
-            };
-            $str = $url . ';' . implode(';', $value);
-            $str = iconv('utf-8//IGNORE', 'windows-1251//IGNORE', $str);
-            file_put_contents($this->filename, $str . "\n", FILE_APPEND);
-        }
-    }
+
 }
 
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 
 <head>
     <meta charset="UTF-8">
@@ -263,31 +437,80 @@ class siteparser
 </head>
 
 <body>
+    <h1>SEO Сканер</h1>
     <?
-    if (($_REQUEST['site'] != '') && ($_REQUEST['date'] != '')) {
-        $spider = new siteparser($_REQUEST['site'], $_REQUEST['date']);
-        $n = 0 + $_REQUEST['n'];
-        $n = $spider->do($n, 10);
-        echo '<p>Проанализировано: ' . $n . ' / '.count($spider->pages_links).'</p>';
-        $link = '?site=' . $_REQUEST['site'] . '&date=' . $_REQUEST['date'] . '&n=' . $n;
-        echo '<p><a href="' . $link . '">Далее</a></p>';
-        echo '<p><a href="' . $spider->download . '">Смотреть промежуточный результат</a></p>';
-        if ($n > 0 + $_REQUEST['n']) {
-            ?>
-            <script>
-                setTimeout(function() {
-                    location = "<?=$link?>";
-                }, 2000);
-            </script>
-            <?
+    $SITE = '';
+    if ($_REQUEST['site'] != '') {
+        if (filter_var($url, FILTER_VALIDATE_URL) !== FALSE) {
+            $SITE = $_REQUEST['site'];
         };
-    } else {
+    };
+    if ($SITE != '') {
+        $spider = new siteparser($SITE);
+    };
+    if (($SITE != '') && ($_REQUEST['date'] != '')) {
+        $date = $_REQUEST['date'];
+        /******************** */
+        /* Сканирование сайта */
+        if ($_REQUEST['a'] == 'scan') {
+
+            $nstart = 0 + $_REQUEST['n'];
+            $limit = max(1, $_REQUEST['limit'];)
+            $nfinish = $spider->do($nstart, $limit, $date);
+            echo '<p>Проанализировано: ' . $nfinish . ' / '.$spider->count.'</p>';
+            $link = '?a=scan&site=' . $SITE . '&date=' . $date . '&n=' . $nfinish;
+            echo '<p><a href="' . $link . '">Далее</a></p>';
+            if ($nfinish > $nstart) {
+                ?>
+                <script>
+                    setTimeout(function() {
+                        location = "<?=$link?>";
+                    }, 2000);
+                </script>
+                <?
+            };
+        };
+        /******************** */
+        /* Сканирование сайта */
+        if ($_REQUEST['a'] == 'report') {
+
+        };
+    } else  if ($SITE != '') {
+        echo '<h2>'.$SITE.'</h2>';
+        echo '<p>Известно страниц: '.$spider->count.'</p>';
+
     ?>
+        <h3>Cканировать</h3>
+        <form action="">
+            <input type="hidden" name="a" value="scan">
+            <input type="hidden" name="site" value="<?= $_REQUEST['site']?>">
+            <input type="hidden" name="date" value="<?= date('Y.m.d H:i:s') ?>">
+
+            <p>
+                <label title="Сколько страниц сканировать за один шаг">Шаг сканирования (страниц)</label>
+                <input type="number" name="limit" value="3">
+            </p>
+            <p>
+                <input type="submit" name="submit" value="Сканировать">
+            </P>
+        </form>
+
+        <!-- todo
+        <h3>Истории сканирования</h3>
+        <form action="?a=report" target="_blank">
+            <input type="hidden" name="site" value="<?= $_REQUEST['site']?>">
+            <input type="hidden" name="date" value="<?= date('Y.m.d H:i:s') ?>">
+            <input type="submit" name="submit" value="Отчет">
+        </form>
+        -->
+    <? } else { ?>
+        <h3>Начало</h3>
         <form action="">
             <input type="text" name="site" placeholder="https://site.ru">
-            <input type="hidden" name="date" value="<?= date('YmdHis') ?>">
-            <input type="submit" name="submit" value="Сканировать">
+            <input type="submit" name="submit" value="Начать">
         </form>
+
+
     <? } ?>
 </body>
 
