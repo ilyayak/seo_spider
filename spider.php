@@ -31,6 +31,14 @@ class siteparser
             );
         ';
 
+        /* Таблица хранит url sitemaps */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS sitemap (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT
+            );
+        ';
+
         /* Код ответа сайтева на страницу */
         $querys[] = '
             CREATE TABLE IF NOT EXISTS code (
@@ -116,6 +124,8 @@ class siteparser
         $count = $this->DB->querySingle($query);
         if ($count == 0) {
             $this->add_url($this->site);
+            $this->add_url($this->site.'/sitemap.xml');
+            $this->add_url($this->site.'/robots.txt');
         }
         $this->count = $count;
     }
@@ -171,42 +181,48 @@ class siteparser
                 $this->DB->query($query);
 
                 if ($res['header']['reponse_code'] == 200) {
-                    $res2 = $this->parse_page($res['content'], $id);
+                    if ($url == $this->site.'/sitemap.xml') {
 
-                    $query = 'INSERT INTO meta (id_page, name, content, date) VALUES (
-                        '.$id.',
-                        "title",
-                        "'.$res2['title'].'",
-                        "'.$date.'"
-                    );';
-                    $this->DB->query($query);
+                    } else if ($url == $this->site.'/robots.txt') {
 
-                    foreach ($res2['meta'] as $name=>$content) {
+                    } else {
+                        $res2 = $this->parse_page($res['content'], $id);
+
                         $query = 'INSERT INTO meta (id_page, name, content, date) VALUES (
                             '.$id.',
-                            "'.$name.'",
-                            "'.$content.'",
+                            "title",
+                            "'.$res2['title'].'",
                             "'.$date.'"
                         );';
                         $this->DB->query($query);
-                    }
 
-                    $h = 1;
-                    while ($h < 6) {
-                        if (is_array($res2['h'.$h])) {
-                            foreach ($res2['h'.$h] as $hcontent) {
-                                $query = 'INSERT INTO h16 (id_page, name, content, date) VALUES (
-                                    '.$id.',
-                                    "'.'h'.$h.'",
-                                    "'.$hcontent.'",
-                                    "'.$date.'"
-                                );';
-                                $this->DB->query($query);
-                            }
+                        foreach ($res2['meta'] as $name=>$content) {
+                            $query = 'INSERT INTO meta (id_page, name, content, date) VALUES (
+                                '.$id.',
+                                "'.$name.'",
+                                "'.$content.'",
+                                "'.$date.'"
+                            );';
+                            $this->DB->query($query);
+                        }
+
+                        $h = 1;
+                        while ($h < 6) {
+                            if (is_array($res2['h'.$h])) {
+                                foreach ($res2['h'.$h] as $hcontent) {
+                                    $query = 'INSERT INTO h16 (id_page, name, content, date) VALUES (
+                                        '.$id.',
+                                        "'.'h'.$h.'",
+                                        "'.$hcontent.'",
+                                        "'.$date.'"
+                                    );';
+                                    $this->DB->query($query);
+                                }
+                            };
+                            $h++;
                         };
-                        $h++;
-                    };
-                    echo '<p>' . $url . ' (new links: '.count($res2['links']).')</p>';
+                        echo '<p>' . $url . ' (new links: '.count($res2['links']).')</p>';
+                    }
                 }
             };
             $i++;
@@ -259,10 +275,14 @@ class siteparser
       [^>]*>
 
       ~ix';
-
+        $result = [];
         if (preg_match_all($pattern, $str, $out))
-            return array_combine($out[1], $out[2]);
-        return array();
+        {
+            foreach ($out[1] as $k=>$v) {
+                $result[$v][] = $out[2][$k];
+            }
+        }
+        return $result;
     }
 
     function parse_page($content, $id_page_source)
@@ -285,7 +305,9 @@ class siteparser
 
         $metalink  = $this->getMetaLinks($content);
         $result['metalink'] = $metalink;
+        echo '<pre>';
         print_r($metalink);
+        echo '</pre>';
         die();
         /* h1 - h6 */
 
@@ -409,6 +431,8 @@ class siteparser
                     };
                 };
             };
+        } else {
+            /* Todo -сохраняить ссылки не по протоколу http */
         };
 
         if ($need_add) {
@@ -441,7 +465,7 @@ class siteparser
     <?
     $SITE = '';
     if ($_REQUEST['site'] != '') {
-        if (filter_var($url, FILTER_VALIDATE_URL) !== FALSE) {
+        if (filter_var($_REQUEST['site'], FILTER_VALIDATE_URL) !== false) {
             $SITE = $_REQUEST['site'];
         };
     };
@@ -455,7 +479,7 @@ class siteparser
         if ($_REQUEST['a'] == 'scan') {
 
             $nstart = 0 + $_REQUEST['n'];
-            $limit = max(1, $_REQUEST['limit'];)
+            $limit = max(1, $_REQUEST['limit']);
             $nfinish = $spider->do($nstart, $limit, $date);
             echo '<p>Проанализировано: ' . $nfinish . ' / '.$spider->count.'</p>';
             $link = '?a=scan&site=' . $SITE . '&date=' . $date . '&n=' . $nfinish;
