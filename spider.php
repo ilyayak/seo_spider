@@ -15,6 +15,7 @@ include('siteparser.class.php');
 
 <body>
     <h1>SEO Сканер</h1>
+
     <?
     $SITE = '';
     if ($_REQUEST['site'] != '') {
@@ -24,19 +25,60 @@ include('siteparser.class.php');
     };
     if ($SITE != '') {
         $spider = new siteparser($SITE);
+    };?>
+    <nav>
+        <ul>
+            <li>
+                <a href="?a=start">Начало</a>
+            </li>
+            <?  if ($SITE != '') {?>
+            <li>
+                <a href="?a=scan">Сканирование</a>
+            </li>
+            <li>
+                <a href="?a=test">Тестирование</a>
+            </li>
+            <li>
+                <a href="?a=report">Отчеты</a>
+            </li>
+            <?}?>
+        </ul>
+    </nav>
+    <?
+    $action = $_REQUEST['a'];
+    if (!in_array($action, ['start', 'scan', 'test', 'report'])) {
+        $action = 'start';
     };
-    if (($SITE != '') && ($_REQUEST['a'] != '')) {
-        $date = $_REQUEST['date'];
-        /******************** */
-        /* Сканирование сайта */
-        if ($_REQUEST['a'] == 'scan') {
+    if ($SITE == '') {
+        $action = 'start';
+    };
 
+    /********************************** */
+
+    if ($SITE != '') {
+        echo '<h2>'.$SITE .'</h2>';
+    };
+
+    if ($action == 'start') {
+        echo  '
+        <h3>Начало</h3>
+        <form action="">
+            <input type="text" name="site" placeholder="https://site.ru">
+            <input type="submit" name="submit" value="Начать">
+        </form>';
+    };
+
+    /********************************** */
+
+    if ($action == 'scan') {
+        echo  '<h3>Cканировать</h3>';
+        if (isset($_REQUEST['start'])) {
             $start = 0 + $_REQUEST['start'];
             $limit = max(1, $_REQUEST['limit']);
             $finish = $spider->scan($start, $limit, $date);
-            echo '<p>Проанализировано: ' . $finish . ' / ' . $spider->count . '</p>';
+            echo '<p>Просканировано: ' . $finish . ' / ' . $spider->count . '</p>';
             if ($finish < $spider->count) {
-                $link = '?a=scan&site=' . $SITE . '&date=' . $date . '&start=' . $finish . '&limit=' . $limit;
+                $link = '?a=scan&site=' . $SITE . '&start=' . $finish . '&limit=' . $limit;
                 echo '<p><a href="' . $link . '">Далее</a></p>';
                 echo '
                 <script>
@@ -46,61 +88,39 @@ include('siteparser.class.php');
                 </script>
                 ';
             } else {
-                $link = '?a=report&site=' . $SITE . '';
-                echo '<p><a href="' . $link . '">Отчеты</a></p>';
+                echo '<p>Готово</p>';
             };
-        };
-        /******************** */
-        /* Сканирование сайта */
-        if ($_REQUEST['a'] == 'report') {
-            ?>
+        } else {
 
-            <h3>Отчеты</h3>
-
-            <form action="" target="_blank">
-                <input type="hidden" name="a" value="report">
-                <input type="hidden" name="site" value="<?= $_REQUEST['site'] ?>">
-                <select name="type">
-                <option value="main">Основной</option>
-                </select>
-                <input type="submit" name="submit" value="Отчет">
+            echo '
+            <form action="">
+                <input type="hidden" name="a" value="scan">
+                <input type="hidden" name="start" value="0">
+                <input type="hidden" name="site" value="'. $SITE .'">
+                <p>
+                    <label title="Сколько страниц сканировать за один шаг">Шаг сканирования (страниц)</label>
+                    <input type="number" name="limit" value="3">
+                </p>
+                <p>
+                    <input type="submit" name="submit" value="Сканировать">
+                </P>
             </form>
-            <?
+            ';
 
-            echo $spider->report($_REQUEST['type']);
-        };
-    } else  if ($SITE != '') {
-        echo '<h2>' . $SITE . '</h2>';
-        echo '<p>Известно страниц: ' . $spider->count . '</p>';
+        }
+    }
 
-        ?>
-        <h3>Cканировать</h3>
-        <form action="">
-            <input type="hidden" name="a" value="scan">
-            <input type="hidden" name="site" value="<?= $_REQUEST['site'] ?>">
-            <p>
-                <label title="Сколько страниц сканировать за один шаг">Шаг сканирования (страниц)</label>
-                <input type="number" name="limit" value="3">
-            </p>
-            <p>
-                <input type="submit" name="submit" value="Сканировать">
-            </P>
-        </form>
+    /********************************** */
 
-        <?
-        $link = '?a=report&site=' . $SITE . '';
-        echo '<p><a href="' . $link . '">Отчеты</a></p>';
-        ?>
+    if ($action == 'test') {
 
-    <? } else { ?>
-        <h3>Начало</h3>
-        <form action="">
-            <input type="text" name="site" placeholder="https://site.ru">
-            <input type="submit" name="submit" value="Начать">
-        </form>
+    }
 
+    /********************************** */
 
-    <? } ?>
+    if ($action == 'report') {
+        echo $spider->report('main');
+    }
+    ?>
 </body>
-
 </html>

@@ -1,4 +1,44 @@
 <?php
+
+/*
+todo:
+1) Парсеры
+    - sitemap.xml
+    - robots.txt
+2) Тесты на существование
+    - Favicons
+    - OpenGraph
+    - title
+    - description
+    - canonical
+    - h1
+    - ссылки на страницу в sitemap.xml
+    - YM
+    - GA
+    - meta viewport
+3) Тесты на уникальность
+    - title
+    - description
+    - content
+    - h1
+4) Тесты на проиводительность
+    - кол-во и сжатость css
+    - кол-во и сжатость js
+    - где расположены css и js
+    - размеры контента/картинок
+5) Тест на lazyload
+6) Тест на ошибки в верстке (https://validator.w3.org/)
+7) Тест урлов на 404
+8) Тест урлов на 301
+9) Тест на htpp / https, должен правильно редиректить
+10) Тест если добавлять удалять слеши с конце
+11) Тест если добвить в конец случайные символы должен вернуть 404
+12) Тест микроразметка Хлебных крошек
+13) Использование webp
+14) Тест на Last Modified и If-Modified-Since
+15) ссылки на внешние ресурсы с target="_blacnk" rel="nofollow"
+
+*/
 class siteparser
 {
     var $site = '',
@@ -28,13 +68,22 @@ class siteparser
         $querys[] = '
             CREATE TABLE IF NOT EXISTS page (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                url TEXT
+                url TEXT,
+                urltype TEXT
             );
         ';
 
         /* Таблица хранит url sitemaps */
         $querys[] = '
             CREATE TABLE IF NOT EXISTS sitemap (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT
+            );
+        ';
+
+        /* Таблица хранит url images */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS image (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 url TEXT
             );
@@ -107,6 +156,8 @@ class siteparser
                 error TEXT
             );
         ';
+
+
 
         foreach ($querys as $query) {
             $this->DB->query($query);
