@@ -39,6 +39,8 @@ todo:
 15) ссылки на внешние ресурсы с target="_blacnk" rel="nofollow"
 
 */
+include_once('htmlparser.class.php');
+
 class siteparser
 {
     var $site = '',
@@ -66,24 +68,7 @@ class siteparser
 
         /* Таблица хранит url страниц */
         $querys[] = '
-            CREATE TABLE IF NOT EXISTS page (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                url TEXT,
-                urltype TEXT
-            );
-        ';
-
-        /* Таблица хранит url sitemaps */
-        $querys[] = '
-            CREATE TABLE IF NOT EXISTS sitemap (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                url TEXT
-            );
-        ';
-
-        /* Таблица хранит url images */
-        $querys[] = '
-            CREATE TABLE IF NOT EXISTS image (
+            CREATE TABLE IF NOT EXISTS url (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 url TEXT
             );
@@ -91,42 +76,15 @@ class siteparser
 
         /* Код ответа сайтева на страницу */
         $querys[] = '
-            CREATE TABLE IF NOT EXISTS code (
+            CREATE TABLE IF NOT EXISTS info (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 id_page INTEGER,
-                responce_code TEXT
+                section TEXT,
+                key TEXT,
+                value TEXT
             );
         ';
-
-        /* Мета теши и тайтл страницы */
-        $querys[] = '
-            CREATE TABLE IF NOT EXISTS meta (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                id_page INTEGER,
-                name TEXT,
-                content TEXT
-            );
-        ';
-
-        /* Link canonical, styles, alternate страницы */
-        $querys[] = '
-            CREATE TABLE IF NOT EXISTS link (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                id_page INTEGER,
-                rel TEXT,
-                href TEXT
-            );
-        ';
-
-        /* h1-h6 на странице */
-        $querys[] = '
-            CREATE TABLE IF NOT EXISTS h16 (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                id_page INTEGER,
-                name TEXT,
-                content TEXT
-            );
-        ';
+        
 
         /* Источники ссылок на страницу */
         $querys[] = '
@@ -178,13 +136,13 @@ class siteparser
 
         $count_pages = $start;
 
-        $query = 'SELECT id, url FROM page LIMIT ' . $start . ', ' . $limit;
+        $query = 'SELECT id, url FROM url LIMIT ' . $start . ', ' . $limit;
         $result = $this->DB->query($query);
 
         while ($row = $result->fetchArray()) {
             $id = $row['id'];
             $url = $row['url'];
-
+            echo '<p>' . $url . ':';
             $res = $this->get_contents($url);
 
             if ($res['error'] != '') {
@@ -193,76 +151,28 @@ class siteparser
                     "' . $res['error'] . '"
                 );';
                 $this->DB->query($query);
-                $query = 'INSERT INTO code (id_page, responce_code) VALUES (
-                    ' . $id . ',
-                    "LOOK ERROR"
-                );';
-                $this->DB->query($query);
+                echo 'ERROR - '.$res['error'];
             } else {
-                $query = 'INSERT INTO code (id_page, responce_code) VALUES (
-                    ' . $id . ',
-                    "' . $res['header']['reponse_code'] . '"
-                );';
-                $this->DB->query($query);
+                
+                $query = 'INSERT INTO info (id_page, section, key, value) VALUES ';
+                $query .= '(' . $id . ', "HEADER", "response_code", "'.$res['info']['http_code'].'"),';
+                foreach ($res['info'] as $key=>$value) {
+                    $query .= '(' . $id . ', "HEADER", "'.$key.'", "'.$value.'"),';
+                };
 
-                if ($res['header']['reponse_code'] == 200) {
-                    if ($url == $this->site . '/sitemap.xml') {
-                    } else if ($url == $this->site . '/robots.txt') {
-                    } else {
-                        $res2 = $this->parse_page($res['content'], $id);
+                $this->DB->query(trim($query, ','));
 
-                        $query = 'INSERT INTO meta (id_page, name, content) VALUES (
-                            ' . $id . ',
-                            "title",
-                            "' . $res2['title'] . '"
-                        );';
-                        $this->DB->query($query);
+                echo $res['info']['http_code'];
 
-                        if (is_array($res2['meta'])) {
-                            foreach ($res2['meta'] as $name => $content) {
-                                $query = 'INSERT INTO meta (id_page, name, content) VALUES (
-                                    ' . $id . ',
-                                    "' . $name . '",
-                                    "' . $content . '"
-                                );';
-                                $this->DB->query($query);
-                            }
-                        }
-
-                        if (is_array($res2['metalink'])) {
-                            foreach ($res2['meta'] as $name => $values) {
-                                if (is_array($values)) {
-                                    foreach ($values as $href) {
-                                        $query = 'INSERT INTO meta (id_page, rel, href, full) VALUES (
-                                            ' . $id . ',
-                                            "' . $name . '",
-                                            "' . $val . '",
-                                            "' . $val . '"
-                                        );';
-                                        $this->DB->query($query);
-                                    };
-                                };
-                            };
-                        };
-
-                        $h = 1;
-                        while ($h < 6) {
-                            if (is_array($res2['h' . $h])) {
-                                foreach ($res2['h' . $h] as $hcontent) {
-                                    $query = 'INSERT INTO h16 (id_page, name, content) VALUES (
-                                        ' . $id . ',
-                                        "' . 'h' . $h . '",
-                                        "' . $hcontent . '"
-                                    );';
-                                    $this->DB->query($query);
-                                }
-                            };
-                            $h++;
-                        };
-                        echo '<p>' . $url . ' (new links: ' . count($res2['links']) . ')</p>';
+                if ($res['info']['http_code'] == 200) {
+                    if (strpos($res['info']['content_type'], 'html') !== false) { 
+                        $this->parse_html($id, $res['content']);
+                        echo '  HTML ';
                     }
                 }
+
             };
+            echo '</p>';
             $count_pages++;
         };
         $query = 'SELECT COUNT(*) as count FROM page';
@@ -273,122 +183,51 @@ class siteparser
         return $count_pages;
     }
 
-    function getMetaTags($str)
+    function parse_html($id, $content)
     {
-        $pattern = '
-      ~<\s*meta\s
+        $res2 = CHtmlParser::parse($content);
+        
+        $query = 'INSERT INTO info (id_page, section, key, value) VALUES ';
+        $query .= '(' . $id . ', "HEAD", "title", "'.$res2['title'].'"),';
 
-      # using lookahead to capture type to $1
-        (?=[^>]*?
-        \b(?:name|property|http-equiv)\s*=\s*
-        (?|"\s*([^"]*?)\s*"|\'\s*([^\']*?)\s*\'|
-        ([^"\'>]*?)(?=\s*/?\s*>|\s\w+\s*=))
-      )
-
-      # capture content to $2
-      [^>]*?\bcontent\s*=\s*
-        (?|"\s*([^"]*?)\s*"|\'\s*([^\']*?)\s*\'|
-        ([^"\'>]*?)(?=\s*/?\s*>|\s\w+\s*=))
-      [^>]*>
-
-      ~ix';
-
-        if (preg_match_all($pattern, $str, $out))
-            return array_combine($out[1], $out[2]);
-        return array();
-    }
-
-
-    function getMetaLinks($str)
-    {
-        $pattern = '
-      ~<\s*link\s
-
-      # using rel to $1
-        (?=[^>]*?
-        \b(?:rel)\s*=\s*
-        (?|"\s*([^"]*?)\s*"|\'\s*([^\']*?)\s*\'|
-        ([^"\'>]*?)(?=\s*/?\s*>|\s\w+\s*=))
-      )
-
-      # capture href to $2
-      [^>]*?\bhref\s*=\s*
-        (?|"\s*([^"]*?)\s*"|\'\s*([^\']*?)\s*\'|
-        ([^"\'>]*?)(?=\s*/?\s*>|\s\w+\s*=))
-      [^>]*>
-
-      ~ix';
-        $result = [];
-        if (preg_match_all($pattern, $str, $out)) {
-            foreach ($out[1] as $k => $v) {
-                $result[$v][] = $out[2][$k];
+        if (is_array($res2['meta'])) {
+            foreach ($res2['meta'] as $name => $content) {
+                $query .= '(' . $id . ', "META", "'.$name.'", "'.$content.'"),';
             }
         }
-        return $result;
-    }
 
-    function parse_page($content, $id_page_source)
-    {
-        /* title */
-        $matches = [];
-        $res = preg_match("/<title>(.*)<\/title>/siU", $content, $matches);
-        if (!$res) {
-            $result['title'] = '';
-        } else {
-            $title = preg_replace('/\s+/', ' ', $matches[1]);
-            $title = trim($title);
-            $result['title'] = $title;
-        };
-
-        /* meta tags */
-        $meta  = $this->getMetaTags($content);
-        $result['meta'] = $meta;
-
-        /* link в head */
-        $metalink  = $this->getMetaLinks($content);
-        $result['metalink'] = $metalink;
-
-        /* h1 - h6 */
-        $i = 1;
-        while ($i < 6) {
-            $matches = [];
-
-            $res = preg_match_all('/<h' . $i . '.*>(.*)<\/h' . $i . '>/siU', $content, $matches);
-            $result['h' . $i] = array();
-            if (!$res) {
-            } else {
-                foreach ($matches[1] as $match) {
-                    $h = preg_replace('/\s+/', ' ', $match);
-                    $h = trim(strip_tags($h));
-                    $result['h' . $i][] .= $h;
+        if (is_array($res2['metalink'])) {
+            foreach ($res2['metalink'] as $name => $values) {
+                if (is_array($values)) {
+                    foreach ($values  as $content) {
+                        $query .= '(' . $id . ', "LINK", "'.$name.'", "'.$content.'"),';
+                    };
                 };
             };
-            $i++;
         };
 
-
-        $result['links'] = array();
-        if (preg_match_all("/<a\s[^>]*href=(\"??)([^\" >]*?)\\1[^>]*>(.*)<\/a>/siU", $content, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $url = $this->prepare_url($match[2]);
-                if ($this->add_url($url)) {
-                    $result['links'][] = $url;
-                };
-                $query = 'SELECT id FROM page WHERE url ="' . $url . '";';
-                $id_page = $this->DB->querySingle($query);
-
-                if (is_numeric($id_page)) {
-                    $query = 'INSERT INTO source (id_page, id_page_source) VALUES (
-                        ' . $id_page . ',
-                        ' . $id_page_source . '
-                    );';
-                    $this->DB->query($query);
+        $h = 1;
+        while ($h < 6) {
+            if (is_array($res2['h' . $h])) {
+                foreach ($res2['h' . $h] as $hcontent) {
+                    $query .= '(' . $id . ', "TAG H", "h' . $h.'", "'.$hcontent.'"),';
                 }
-                // $match[2] = link address
-                // $match[3] = link text
+            };
+            $h++;
+        };
+        if (is_array($res2['links'])) {
+            foreach ($res2['links'] as $link) {
+                
+                $id_page = $this->add_url($link[0]);
+                if ($id_page) {
+                    $query = 'INSERT INTO source (id_page, id_page_source) VALUES';
+                    $query .= '('.$id_page.', '.$id.')';
+                }
             }
         }
-        return $result;
+
+        $this->DB->query(trim($query, ','));
+        
     }
 
     function get_contents($url)
@@ -396,36 +235,16 @@ class siteparser
         if (filter_var($url, FILTER_VALIDATE_URL) === FALSE) {
             $result['error'] = 'This is not url';
         } else {
-            $result['content'] = @file_get_contents($url);
-            $result['header'] = $this->parseHeaders($http_response_header);
-            if (($result['content'] == '') && ($http_response_header === NULL)) {
                 $ch = curl_init();
                 curl_setopt($ch, CURLOPT_URL, $url);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 $response = curl_exec($ch);
-                $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+                $info = curl_getinfo($ch);
                 $result['content'] = $response;
-                $result['header']['reponse_code'] = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+                $result['info'] = $info;
             }
         }
         return $result;
-    }
-
-    function parseHeaders($headers)
-    {
-        $head = array();
-        foreach ($headers as $k => $v) {
-            $t = explode(':', $v, 2);
-            if (isset($t[1]))
-                $head[trim($t[0])] = trim($t[1]);
-            else {
-                $head[] = $v;
-                if (preg_match("#HTTP/[0-9\.]+\s+([0-9]+)#", $v, $out)) {
-                    $head['reponse_code'] = intval($out[1]);
-                }
-            }
-        }
-        return $head;
     }
 
     function prepare_url($url)
@@ -459,9 +278,10 @@ class siteparser
             (substr($url, 0, 7) != 'mailto:')
         ) {
             if ($url != '') {
+                $url = $this->prepare_url($url);
                 if (strpos($url, $this->site) !== false) {
                     if ($this->site . '/' != $url) {
-                        $query = 'SELECT COUNT(*) as count FROM page WHERE url = "' . $url . '"';
+                        $query = 'SELECT COUNT(*) as count FROM url WHERE url = "' . $url . '"';
                         $count = $this->DB->querySingle($query);
                         if ($count == 0) {
                             $need_add = true;
@@ -470,14 +290,14 @@ class siteparser
                 };
             };
         } else {
-            /* Todo -сохраняить ссылки не по протоколу http */
+            /* Todo -сохраняить ссылки не по протоколу http/s */
         };
 
         if ($need_add) {
-            $query = 'INSERT INTO page (url) VALUES ("' . $url . '");';
+            $query = 'INSERT INTO url (url) VALUES ("' . $url . '");';
             $this->DB->query($query);
             $ID = $this->DB->lastInsertRowID();
-            return $url;
+            return $ID;
         };
         return $need_add;
     }
