@@ -57,7 +57,7 @@ class siteparser
         $this->create_table();
 
         $this->site = trim($site, '/');
-        $query = 'SELECT COUNT(*) as count FROM page';
+        $query = 'SELECT COUNT(*) as count FROM url';
         $count = $this->DB->querySingle($query);
 
         $this->count = $count;
@@ -84,7 +84,7 @@ class siteparser
                 value TEXT
             );
         ';
-        
+
 
         /* Источники ссылок на страницу */
         $querys[] = '
@@ -101,6 +101,9 @@ class siteparser
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 id_page INTEGER,
                 src TEXT,
+                datasrc TEXT,
+                srcset TEXT,
+                datasrcset TEXT,
                 alt TEXT,
                 title TEXT
             );
@@ -153,10 +156,13 @@ class siteparser
                 $this->DB->query($query);
                 echo 'ERROR - '.$res['error'];
             } else {
-                
+
                 $query = 'INSERT INTO info (id_page, section, key, value) VALUES ';
                 $query .= '(' . $id . ', "HEADER", "response_code", "'.$res['info']['http_code'].'"),';
                 foreach ($res['info'] as $key=>$value) {
+                    if (is_array($value)) {
+                        $value = print_r($value, true);
+                    };
                     $query .= '(' . $id . ', "HEADER", "'.$key.'", "'.$value.'"),';
                 };
 
@@ -165,7 +171,7 @@ class siteparser
                 echo $res['info']['http_code'];
 
                 if ($res['info']['http_code'] == 200) {
-                    if (strpos($res['info']['content_type'], 'html') !== false) { 
+                    if (strpos($res['info']['content_type'], 'html') !== false) {
                         $this->parse_html($id, $res['content']);
                         echo '  HTML ';
                     }
@@ -175,7 +181,7 @@ class siteparser
             echo '</p>';
             $count_pages++;
         };
-        $query = 'SELECT COUNT(*) as count FROM page';
+        $query = 'SELECT COUNT(*) as count FROM url';
         $count = $this->DB->querySingle($query);
 
         $this->count = $count;
@@ -185,19 +191,20 @@ class siteparser
 
     function parse_html($id, $content)
     {
-        $res2 = CHtmlParser::parse($content);
-        
-        $query = 'INSERT INTO info (id_page, section, key, value) VALUES ';
-        $query .= '(' . $id . ', "HEAD", "title", "'.$res2['title'].'"),';
+        $htmlparser = new CHtmlParser;
+        $parsed = $htmlparser->parse($content);
 
-        if (is_array($res2['meta'])) {
-            foreach ($res2['meta'] as $name => $content) {
+        $query = 'INSERT INTO info (id_page, section, key, value) VALUES ';
+        $query .= '(' . $id . ', "HEAD", "title", "'.$parsed['title'].'"),';
+
+        if (is_array($parsed['meta'])) {
+            foreach ($parsed['meta'] as $name => $content) {
                 $query .= '(' . $id . ', "META", "'.$name.'", "'.$content.'"),';
             }
         }
 
-        if (is_array($res2['metalink'])) {
-            foreach ($res2['metalink'] as $name => $values) {
+        if (is_array($parsed['metalink'])) {
+            foreach ($parsed['metalink'] as $name => $values) {
                 if (is_array($values)) {
                     foreach ($values  as $content) {
                         $query .= '(' . $id . ', "LINK", "'.$name.'", "'.$content.'"),';
@@ -208,42 +215,54 @@ class siteparser
 
         $h = 1;
         while ($h < 6) {
-            if (is_array($res2['h' . $h])) {
-                foreach ($res2['h' . $h] as $hcontent) {
+            if (is_array($parsed['h' . $h])) {
+                foreach ($parsed['h' . $h] as $hcontent) {
                     $query .= '(' . $id . ', "TAG H", "h' . $h.'", "'.$hcontent.'"),';
                 }
             };
             $h++;
         };
-        if (is_array($res2['links'])) {
-            foreach ($res2['links'] as $link) {
-                
+        if (is_array($parsed['links'])) {
+            foreach ($parsed['links'] as $link) {
                 $id_page = $this->add_url($link[0]);
-                if ($id_page) {
-                    $query = 'INSERT INTO source (id_page, id_page_source) VALUES';
-                    $query .= '('.$id_page.', '.$id.')';
-                }
+                $this->add_source_page($id_page, $id);
             }
         }
 
         $this->DB->query(trim($query, ','));
-        
+
+        if (is_array($parsed['images'])) {
+            $query = 'INSERT INTO image (id_page, src, datasrc, srcset, datasrcset, alt, title) VALUES';
+            $arSrc = ['src', 'datasrc', 'srcset', 'datasrcset'];
+            foreach ($parsed['images'] as $img) {
+                $query .= '('.$id.', "'.$img['src'].'",  "'.$img['datasrc'].'", "'.$img['srcset'].'", "'.$img['datasrcset'].'", "'.$img['alt'].'", "'.$img['title'].'"),';
+                foreach ($arSrc as $src) {
+                    if ($img[$src] != '') {
+                        $id_page = $this->add_url($img[$src]);
+                        $this->add_source_page($id_page, $id);
+                    }
+                }
+            };
+            $this->DB->query(trim($query, ','));
+        }
+
+
     }
 
     function get_contents($url)
     {
+        $result = array();
         if (filter_var($url, FILTER_VALIDATE_URL) === FALSE) {
             $result['error'] = 'This is not url';
         } else {
-                $ch = curl_init();
-                curl_setopt($ch, CURLOPT_URL, $url);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                $response = curl_exec($ch);
-                $info = curl_getinfo($ch);
-                $result['content'] = $response;
-                $result['info'] = $info;
-            }
-        }
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $response = curl_exec($ch);
+            $info = curl_getinfo($ch);
+            $result['content'] = $response;
+            $result['info'] = $info;
+        };
         return $result;
     }
 
@@ -300,6 +319,14 @@ class siteparser
             return $ID;
         };
         return $need_add;
+    }
+
+    function add_source_page($id_page, $id_page_source) {
+        if ((is_numeric($id_page)) && (is_numeric($id_page_source))) {
+            $query = 'INSERT INTO source (id_page, id_page_source) VALUES';
+            $query .= '('.$id_page.', '.$id_page_source.')';
+        }
+        $this->DB->query($query);
     }
 
     function report($type)

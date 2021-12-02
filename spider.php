@@ -23,27 +23,21 @@ include('siteparser.class.php');
             $SITE = $_REQUEST['site'];
         };
     };
+    $menu['?a=start'] = 'Начало';
     if ($SITE != '') {
         $spider = new siteparser($SITE);
+        $menu['?a=scan&site='.$SITE] = 'Сканирование';
+        $menu['?a=test&site='.$SITE] = 'Тестирование';
+        $menu['?a=report&site='.$SITE] = 'Отчеты';
     };?>
-    <nav>
-        <ul>
-            <li>
-                <a href="?a=start">Начало</a>
-            </li>
-            <?  if ($SITE != '') {?>
-            <li>
-                <a href="?a=scan">Сканирование</a>
-            </li>
-            <li>
-                <a href="?a=test">Тестирование</a>
-            </li>
-            <li>
-                <a href="?a=report">Отчеты</a>
-            </li>
-            <?}?>
-        </ul>
-    </nav>
+    <ul class="mainmenu">
+        <?foreach($menu as $link=>$title) {
+            echo
+            '<li class="mainmenu--item__list">'.
+            '<a class="mainmenu--item__link" href="'.$link.'">'.$title.'</a>'.
+            '</li>';
+        }?>
+    </ul>
     <?
     $action = $_REQUEST['a'];
     if (!in_array($action, ['start', 'scan', 'test', 'report'])) {

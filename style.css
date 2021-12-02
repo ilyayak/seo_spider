@@ -1,3 +1,30 @@
+.mainmenu {
+    display: flex;
+    padding: 0px;
+    margin: 0px;
+}
+
+.mainmenu--item__list {
+    list-style: none;
+    padding: 0px;
+    margin: 0px;
+}
+
+.mainmenu--item__link {
+    display: flex;
+    padding: 10px 20px;
+    background: #eee;
+    transition: all ease 0.3s;
+    text-decoration: none;
+    color: #000;
+    margin-right: 1px;
+}
+
+.mainmenu--item__link:hover {
+    background: #999;
+    color: #fff;
+}
+
 table {
     border: 1px solid #888;
 }
