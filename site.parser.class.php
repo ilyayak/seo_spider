@@ -141,7 +141,8 @@ class siteparser
         };
     }
 
-    function set_params($params = array()) {
+    function set_params($params)
+    {
         if (is_array($params)) {
             foreach ($this->params as $key=>$val) {
                 $this->params[$key] = $params[$key];
@@ -149,11 +150,12 @@ class siteparser
         };
         $this->params['IGNORE_preg'] = array();
         if ($this->params['IGNORE'] != '') {
-        $arIgnore = explode("\n", $this->params['IGNORE']);
-        if (is_array($arIgnore)) {
-            foreach ($arIgnore as $ignorestr) {
-                $ignorestr = '|'.str_replace('*', '.*', $ignorestr).'|';
-                $this->params['IGNORE_preg'][] = $ignorestr;
+            $arIgnore = explode("\n", $this->params['IGNORE']);
+            if (is_array($arIgnore)) {
+                foreach ($arIgnore as $ignorestr) {
+                    $ignorestr = '|'.str_replace('*', '.*', $ignorestr).'|';
+                    $this->params['IGNORE_preg'][] = $ignorestr;
+                };
             };
         };
         if ($this->params['SKIP_IMAGES'] == 'Y') {
@@ -364,8 +366,8 @@ class siteparser
         if (is_array($parsed['meta'])) {
             foreach ($parsed['meta'] as $name => $content) {
                 $query .= '(' . $id . ', "META", "'.$name.'", "'.$content.'"),';
-            }
-        }
+            };
+        };
 
         if (is_array($parsed['metalink'])) {
             foreach ($parsed['metalink'] as $name => $values) {
@@ -390,8 +392,8 @@ class siteparser
             foreach ($parsed['links'] as $link) {
                 $id_page = $this->add_url($link[0]);
                 $this->add_source_page($id_page, $id);
-            }
-        }
+            };
+        };
 
         $this->DB->query(trim($query, ','));
 
@@ -405,8 +407,8 @@ class siteparser
                         if ($img[$src] != '') {
                             $id_page = $this->add_url($img[$src]);
                             $this->add_source_page($id_page, $id);
-                        }
-                    }
+                        };
+                    };
                 };
                 $this->DB->query(trim($query, ','));
             };
@@ -454,7 +456,8 @@ class siteparser
         return $url;
     }
 
-    function add_error($id_page, $errortext, $section = "", $level = "Low") {
+    function add_error($id_page, $errortext, $section = "", $level = "Low")
+    {
         $query = 'INSERT INTO errors (id_page, error, section, level) VALUES (
             ' . $id_page . ',
             "' . $errortext . '",
@@ -503,7 +506,8 @@ class siteparser
         return $need_add;
     }
 
-    function add_source_page($id_page, $id_page_source) {
+    function add_source_page($id_page, $id_page_source)
+    {
         if ((is_numeric($id_page)) && (is_numeric($id_page_source))) {
             $query = 'INSERT INTO source (id_page, id_page_source) VALUES';
             $query .= '('.$id_page.', '.$id_page_source.')';
@@ -520,7 +524,8 @@ class siteparser
         return $result;
     }
 
-    function report_table($query) {
+    function report_table($query)
+    {
         $result = '';
         if (trim($query) != '') {
             $res = $this->DB->query($query);
@@ -539,23 +544,26 @@ class siteparser
         return $result;
     }
 
-    function report_total_errors() {
+    function report_total_errors()
+    {
         $result = '';
         $query = 'SELECT * FROM url JOIN errors ON url.id = errors.id_page ORDER BY errors.level DESC';
         $result = $this->report_table($query);
         return $result;
+
     }
 
-    function report_urls() {
+    function report_urls()
+    {
         $query = 'SELECT * FROM url';
         $result = $this->report_table($query);
         return $result;
     }
 
-    function report_urls_response_code() {
+    function report_urls_response_code()
+    {
         $query = 'SELECT url.url, info.value FROM url JOIN info ON url.id = info.id_page WHERE  ';
         $result = $this->report_table($query);
         return $result;
     }
-
 }
