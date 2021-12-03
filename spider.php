@@ -1,5 +1,5 @@
 <?
-include('siteparser.class.php');
+include('site.parser.class.php');
 
 ?>
 <!DOCTYPE html>
@@ -29,6 +29,7 @@ include('siteparser.class.php');
         $menu['?a=scan&site='.$SITE] = 'Сканирование';
         $menu['?a=test&site='.$SITE] = 'Тестирование';
         $menu['?a=report&site='.$SITE] = 'Отчеты';
+        $menu['?a=list&site='.$SITE] = 'Список страниц';
     };?>
     <ul class="mainmenu">
         <?foreach($menu as $link=>$title) {
@@ -95,6 +96,9 @@ include('siteparser.class.php');
                     <label title="Сколько страниц сканировать за один шаг">Шаг сканирования (страниц)</label>
                     <input type="number" name="limit" value="3">
                 </p>
+                <!--
+                todo parameters
+                -->
                 <p>
                     <input type="submit" name="submit" value="Сканировать">
                 </P>
@@ -114,6 +118,12 @@ include('siteparser.class.php');
 
     if ($action == 'report') {
         echo $spider->report('main');
+    }
+
+    /********************************** */
+
+    if ($action == 'list') {
+
     }
     ?>
 </body>
