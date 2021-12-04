@@ -64,6 +64,7 @@ class siteparser
         $this->count = $count;
 
         $this->params = array(
+            'SCAN_URLS_PER_STEP' => '3',
             'SKIP_SITEMAP' => 'N',
             'SKIP_ROBOTS' => 'N',
             'SKIP_IMAGES' => 'N',
@@ -75,6 +76,7 @@ class siteparser
             'SKIP_REDIRECT_URLS' => 'N',
             'IGNORE' => ''
         );
+
     }
 
     function create_table()
@@ -134,7 +136,13 @@ class siteparser
             );
         ';
 
-
+        /* Ошибки */
+        $querys[] = '
+            CREATE TABLE IF NOT EXISTS params (
+                setting TEXT,
+                value TEXT
+            );
+        ';
 
         foreach ($querys as $query) {
             $this->DB->query($query);
@@ -162,11 +170,29 @@ class siteparser
             $this->params['IGNORE_preg'][] = '|.*\.(gif|png|jpg|jpeg|bmp|svg|ico)|';
         };
         if ($this->params['SKIP_FILES'] == 'Y') {
-            $this->params['IGNORE_preg'][] = '|.*\.(^html)|';
+            $this->params['IGNORE_preg'][] = '|.*\.(doc|docx|xls|xlsx|pdf|zip|)|';
         };
 
     }
 
+    function load_params() {
+        $query = 'SELECT * FROM params';
+        $res = $this->DB->query($query);
+        while ($row = $res->fetchArray()) {
+            if (isset($this->params[$row['setting']]) {
+                $this->params[$row['setting']] = $row['value'];
+            }
+        }
+    }
+
+    function save_params() {
+        $query = 'DELETE FROM params;';
+        $query .= 'INSERT INTO params (setting, value) VALUES '
+        foreach ($this->params as $key=>$val) {
+            $query .= '(".$key.'" , "'.$val.'" ),';
+        }
+        $this->DB->query($query);
+    }
     /******************************** */
     /******************************** */
     /******************************** */
