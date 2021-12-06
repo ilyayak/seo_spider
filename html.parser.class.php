@@ -3,23 +3,27 @@ class CHtmlParser {
     function parse($content) {
 
         /* title */
-        $result['title'] = $this->getTitle($content);
+        $result['title'] = $this->get_tags('title', $content);
 
         /* meta tags */
-        $result['meta']  = $this->getMetaTags($content);
+        $result['meta']  = $this->get_tags('meta', $content);
 
         /* link в head */
-        $result['metalink']  = $this->getMetaLinks($content);
+        $result['metalink']  = $this->get_tags('link', $content);
 
         /* h1 - h6 */
-        $h16 = $this->getH16($content);
-        $result = array_merge($result, $h16);
+        $result['h1'] = $this->get_tags('h1', $content);
+        $result['h2'] = $this->get_tags('h2', $content);
+        $result['h3'] = $this->get_tags('h3', $content);
+        $result['h4'] = $this->get_tags('h4', $content);
+        $result['h5'] = $this->get_tags('h5', $content);
+        $result['h6'] = $this->get_tags('h6', $content);
 
         /* links */
-        $result['links'] = $this->getLinks($content);
+        $result['links'] = $this->get_tags('a', $content);
 
         /* images */
-        $result['images'] = $this->getImages($content);
+        $result['images'] = $this->get_tags('img', $content);
 
         return $result;
     }
@@ -90,7 +94,8 @@ class CHtmlParser {
         return array();
     }
 
-    function getH16($content) {
+    function getH16($content) 
+    {
         $result = array();
         $i = 1;
         while ($i < 6) {
@@ -123,7 +128,9 @@ class CHtmlParser {
         return $result;
     }
 
-    function getImages($content) {
+    function getImages($content) 
+    {
+        
         $result = array();
         if (preg_match_all('/<img[^>]+>/i',$content, $matches)) {
             foreach ($matches[0] as $match) {
@@ -135,7 +142,67 @@ class CHtmlParser {
                 $result[] = $img;
             };
         };
+        return $result;
+    }
 
+    function get_tags($tag, $content) {
+
+        $arTags['meta'] = array(
+            'tag' => '/<meta[^>]+>/i',
+            'attr'=> '/(name|property|http-equiv|charset|content)=("[^"]*")/i'
+        );
+        $arTags['link'] = array(
+            'tag' => '/<link[^>]+>/i',
+            'attr'=> '/(rel|href|type|media|sizes)=("[^"]*")/i'
+        );
+        $arTags['title'] = array(
+            'tag' => '/<title[^>]+>([^<]+)<\/title>/i',
+        );
+        $arTags['h1'] = array(
+            'tag' => '/<h1[^>]+>([^<]+)<\/h1>/i',
+        );
+        $arTags['h2'] = array(
+            'tag' => '/<h2[^>]+>([^<]+)<\/h2>/i',
+        );
+        $arTags['h3'] = array(
+            'tag' => '/<h3[^>]+>([^<]+)<\/h3>/i',
+        );
+        $arTags['h4'] = array(
+            'tag' => '/<h4[^>]+>([^<]+)<\/h4>/i',
+        );
+        $arTags['h5'] = array(
+            'tag' => '/<h5[^>]+>([^<]+)<\/h5>/i',
+        );
+        $arTags['h6'] = array(
+            'tag' => '/<h6[^>]+>([^<]+)<\/h6>/i',
+        );
+        $arTags['a'] = array(
+            'tag' => '/<a[^>]+>([^<]+)<\/a>/i',
+            'attr'=> '/(href|rel|title}target)=("[^"]*")/i'
+        );
+        $arTags['img'] = array(
+            'tag' => '/<img[^>]+>/i',
+            'attr'=> '/(alt|title|src|data-src|srcset|data-srcset)=("[^"]*")/i'
+        );
+        $result = array();
+        if (isset($arTags[$tag])) {
+            $arTag = $arTags[$tag];
+            if (preg_match_all($arTag['tag'], $content, $matches)) {
+                foreach ($matches[0] as $k=>$match) {
+                    $res_tag = array();
+                    if (isset($arTag['attr'])) {
+                        preg_match_all($arTag['attr'], $match, $attr_matches);
+                        foreach ($attr_matches[1] as $key=>$val) {
+                            $res_tag[$val] = trim($attr_matches[2][$key], '"');
+                        };
+                    }
+                    if (isset($matches[1][$k])) {
+                        $res_tag['text'] = $matches[1][$k]; 
+                    };
+                    $result[] = $res_tag;
+                };
+            };  
+        }
         return $result;
     }
 }
