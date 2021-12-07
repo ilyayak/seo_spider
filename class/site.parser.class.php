@@ -179,17 +179,17 @@ class siteparser
         $query = 'SELECT * FROM params';
         $res = $this->DB->query($query);
         while ($row = $res->fetchArray()) {
-            if (isset($this->params[$row['setting']]) {
+            if (isset($this->params[$row['setting']])) {
                 $this->params[$row['setting']] = $row['value'];
-            }
-        }
+            };
+        };
     }
 
     function save_params() {
         $query = 'DELETE FROM params;';
-        $query .= 'INSERT INTO params (setting, value) VALUES '
+        $query .= 'INSERT INTO params (setting, value) VALUES ';
         foreach ($this->params as $key=>$val) {
-            $query .= '(".$key.'" , "'.$val.'" ),';
+            $query .= '("'.$key.'" , "'.$val.'" ),';
         }
         $this->DB->query($query);
     }
@@ -387,20 +387,53 @@ class siteparser
         $parsed = $htmlparser->parse($content);
 
         $query = 'INSERT INTO info (id_page, section, key, value) VALUES ';
-        $query .= '(' . $id . ', "HEAD", "title", "'.$parsed['title'].'"),';
-
-        if (is_array($parsed['meta'])) {
-            foreach ($parsed['meta'] as $name => $content) {
-                $query .= '(' . $id . ', "META", "'.$name.'", "'.$content.'"),';
+        if (is_array($parsed['title'])) {
+            foreach ($parsed['title'] as $title) {
+                $query .= '(' . $id . ', "HEAD", "title", "'.$title['text'].'"),';
             };
         };
 
-        if (is_array($parsed['metalink'])) {
-            foreach ($parsed['metalink'] as $name => $values) {
-                if (is_array($values)) {
-                    foreach ($values  as $content) {
-                        $query .= '(' . $id . ', "LINK", "'.$name.'", "'.$content.'"),';
-                    };
+        if (is_array($parsed['meta'])) {
+            foreach ($parsed['meta'] as $meta) {
+                $name = '';
+                $content = '';
+                if ($meta['charset'] != '') {
+                    $name = 'charset';
+                    $content = $meta['charset'];
+                };
+                if ($meta['http-equiv'] != '') {
+                    $name = $meta['http-equiv'];
+                };
+                if ($meta['property'] != '') {
+                    $name = $meta['property'];
+                };
+                if ($meta['name'] != '') {
+                    $name = $meta['name'];
+                };
+                if ($meta['content'] != '') {
+                    $content = $meta['content'];
+                };
+                if (($name != '') && ($content != '')) {
+                    $query .= '(' . $id . ', "META", "'.$name.'", "'.$content.'"),';
+                };
+            };
+        };
+
+        if (is_array($parsed['link'])) {
+            foreach ($parsed['link'] as $link) {
+                $name = '';
+                $content = '';
+                if ($link['type'] != '') {
+                    $name = $link['type'];
+                };
+                if ($link['rel'] != '') {
+                    $name = $link['rel'];
+                };
+                if ($link['href'] != '') {
+                    $content = $link['href'];
+                };
+                if (($name != '') && ($content != '')) {
+                    $query .= '(' . $id . ', "LINK", "'.$name.'", "'.$content.'"),';
                 };
             };
         };
@@ -409,14 +442,17 @@ class siteparser
         while ($h < 6) {
             if (is_array($parsed['h' . $h])) {
                 foreach ($parsed['h' . $h] as $hcontent) {
-                    $query .= '(' . $id . ', "TAG H", "h' . $h.'", "'.$hcontent.'"),';
+                    if ($hcontent['text'] != '') {
+                        $query .= '(' . $id . ', "TAG", "H' . $h.'", "'.$hcontent['text'].'"),';
+                    }
                 }
             };
             $h++;
         };
-        if (is_array($parsed['links'])) {
-            foreach ($parsed['links'] as $link) {
-                $id_page = $this->add_url($link[0]);
+        if (is_array($parsed['a'])) {
+            foreach ($parsed['a'] as $link) {
+                $query .= '(' . $id . ', "LINKS", "'.$link['href'].'", "'.$link['text'].'"),';
+                $id_page = $this->add_url($link['href']);
                 $this->add_source_page($id_page, $id);
             };
         };
