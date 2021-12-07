@@ -1,6 +1,5 @@
 <?
-include('site.parser.class.php');
-
+include('class/site.parser.class.php');
 ?>
 <!DOCTYPE html>
 <html lang="ru">

@@ -35,7 +35,7 @@ todo:
 - Использование webp
 - Тест на Last Modified и If-Modified-Since
 - ссылки на внешние ресурсы с target="_blacnk" rel="nofollow"
-
+- Тест есть ли формы на всех страницах
 */
 include_once('html.parser.class.php');
 include_once('sitemap.parser.class.php');
