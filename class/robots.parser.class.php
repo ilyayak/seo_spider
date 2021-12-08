@@ -24,7 +24,7 @@ class CRobotsParser
                     $rule = implode(':', $list);
                     $directive = mb_strtolower(trim($directive));
                     $rule = trim($rule);
-                    $rule_sort =  mb_strlen($rule);
+                    $rule_sort =  10 * mb_strlen($rule);
                     if ($rule_sort  > 0) {
                         if (in_array($directive, $directives)) {
                             if ($directive == 'user-agent') {
