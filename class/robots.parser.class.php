@@ -50,7 +50,7 @@ class CRobotsParser
     }
 
 
-    function urlIsAllow($url, $parsedRules, $agent = '*')
+    function urlIsAllow($url, $parsedRules, $agent = '*', $returnRule = false)
     {
         $result = true;
         if (is_array($parsedRules[$agent])) {
@@ -70,7 +70,15 @@ class CRobotsParser
                 foreach ($rules as $rule => $res) {
                     $reg = '|.*' . str_replace(array('*', '?'), array('.*', '\?'), $rule) . '|';
                     if (preg_match($reg, $url)) {
-                        $result = $res;
+                        if ($returnRule) {
+                            $result = array(
+                                            $rule,
+                                            $res
+                                        );
+                        } else {
+                            $result = $res;
+                        }
+
                     }
                 }
             }

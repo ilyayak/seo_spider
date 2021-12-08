@@ -9,7 +9,7 @@ $htmlParser = new CRobotsParser();
 $result = $htmlParser->parse($test_html);
 print_r_tree($result);
 if ($_GET['url'] != '') {
-    $checkurl = $htmlParser->urlIsAllow($_GET['url'], $result);
+    $checkurl = $htmlParser->urlIsAllow($_GET['url'], $result, '*', true);
     echo '<h3>Результат url '.$_GET['url'].'</h3>';
-    var_dump($checkurl);
+    print_r_tree($checkurl);
 }
