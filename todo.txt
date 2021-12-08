@@ -38,3 +38,7 @@ todo:
 https://webmaster.yandex.ru/siteinfo/?site=siteurl
 
 - Тест PR ?
+
+- Тест на множественные и одинаковые sitemap в robots.txt
+
+- тест на разрешенность для индексирования страниц в robots.txt
