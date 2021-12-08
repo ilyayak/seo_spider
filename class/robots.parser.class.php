@@ -1,5 +1,5 @@
 <?
-class robots_parser
+class CRobotsParser
 {
     function parse($content)
     {
@@ -11,7 +11,6 @@ class robots_parser
             'disallow',
             'allow',
             'sitemap',
-            'host',
             'crawl-delay',
             'clean-param',
         ];
@@ -20,7 +19,9 @@ class robots_parser
             foreach ($arLines as $line) {
                 $line = trim($line);
                 if (strpos($line, ':') !== false) {
-                    list($directive, $rule) = explode(':', $line);
+                    $list = explode(':', $line);
+                    $directive = array_shift($list);
+                    $rule = implode(':', $list);
                     $directive = mb_strtolower(trim($directive));
                     $rule = trim($rule);
                     $rule_sort =  mb_strlen($rule);
@@ -33,6 +34,10 @@ class robots_parser
                                     $rule_sort++;
                                 };
                                 $result[$curAgent][$directive][$rule_sort] = $rule;
+                                ksort($result[$curAgent][$directive]);
+
+                            } else if (in_array($directive, array('sitemap'))) {
+                                $result[$directive][] = $rule;
                             } else {
                                 $result[$curAgent][$directive][] = $rule;
                             };
@@ -60,10 +65,10 @@ class robots_parser
                     $rules[$parsedRules[$agent]['allow'][$i]] = true;
                 }
                 $i++;
-            }
+            };
             if (is_array($rules)) {
                 foreach ($rules as $rule => $res) {
-                    $reg = '|' . str_replace('*', '.*', $rule) . '|';
+                    $reg = '|.*' . str_replace(array('*', '?'), array('.*', '\?'), $rule) . '|';
                     if (preg_match($reg, $url)) {
                         $result = $res;
                     }
