@@ -1,5 +1,5 @@
 <?
-class sitemap_parser {
+class CSitemapParser {
     var $oXml;
     function parse($content) {
         $result = array();
