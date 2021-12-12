@@ -282,7 +282,7 @@ class siteparser
 
     function parse_robots($id, $content)
     {
-        $robots_parser = new robots_parser();
+        $robots_parser = new CRobotsParser();
         $parsed = $robots_parser->parse($content);
         if (is_array($parsed)) {
             foreach ($parsed as $agent) {
@@ -313,7 +313,7 @@ class siteparser
 
     function parse_sitemap($id, $content)
     {
-        $sitemap_parser = new sitemap_parser();
+        $sitemap_parser = new CSitemapParser();
         $parsed = $sitemap_parser->parse($content);
         if (is_array($parsed['ERROR'])) {
             foreach($parsed['ERROR'] as $error) {
@@ -344,7 +344,7 @@ class siteparser
 
     function parse_html($id, $content)
     {
-        $htmlparser = new CHtmlParser;
+        $htmlparser = new CHtmlParser();
         $parsed = $htmlparser->parse($content);
 
         $query = 'INSERT INTO info (id_page, section, key, value) VALUES ';
@@ -423,9 +423,9 @@ class siteparser
         if ($this->params['SKIP_IMAGES'] != 'Y') {
             if (is_array($parsed['images'])) {
                 $query = 'INSERT INTO image (id_page, src, datasrc, srcset, datasrcset, alt, title) VALUES';
-                $arSrc = ['src', 'datasrc', 'srcset', 'datasrcset'];
+                $arSrc = ['src', 'data-src', 'srcset', 'data-srcset'];
                 foreach ($parsed['images'] as $img) {
-                    $query .= '('.$id.', "'.$img['src'].'",  "'.$img['datasrc'].'", "'.$img['srcset'].'", "'.$img['datasrcset'].'", "'.$img['alt'].'", "'.$img['title'].'"),';
+                    $query .= '('.$id.', "'.$img['src'].'",  "'.$img['data-src'].'", "'.$img['srcset'].'", "'.$img['data-srcset'].'", "'.$img['alt'].'", "'.$img['title'].'"),';
                     foreach ($arSrc as $src) {
                         if ($img[$src] != '') {
                             $id_page = $this->add_url($img[$src]);
@@ -435,6 +435,25 @@ class siteparser
                 };
                 $this->DB->query(trim($query, ','));
             };
+
+            if (is_array($parsed['pictures'])) {
+                $query = 'INSERT INTO image (id_page, src, datasrc, srcset, datasrcset) VALUES';
+                $arSrc = ['src', 'data-src', 'srcset', 'data-srcset'];
+                foreach ($parsed['images'] as $pic) {
+                    if (is_array($pic['source'])) {
+                        foreach ($pic['source'] as $img) {
+                            $query .= '('.$id.', "'.$img['src'].'",  "'.$img['data-src'].'", "'.$img['srcset'].'", "'.$img['data-srcset'].'"),';
+                            foreach ($arSrc as $src) {
+                                if ($img[$src] != '') {
+                                    $id_page = $this->add_url($img[$src]);
+                                    $this->add_source_page($id_page, $id);
+                                };
+                            };
+                        };
+                    };
+                };
+                $this->DB->query(trim($query, ','));
+            }
         };
 
 
