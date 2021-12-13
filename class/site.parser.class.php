@@ -37,7 +37,6 @@ class siteparser
             'SKIP_REDIRECT_URLS' => 'N',
             'IGNORE' => ''
         );
-
     }
 
     function create_table()
@@ -51,7 +50,7 @@ class siteparser
             );
         ';
 
-        /* Код ответа сайтева на страницу */
+        /* Свойства страницы */
         $querys[] = '
             CREATE TABLE IF NOT EXISTS info (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,7 +112,7 @@ class siteparser
     function set_params($params)
     {
         if (is_array($params)) {
-            foreach ($this->params as $key=>$val) {
+            foreach ($this->params as $key => $val) {
                 $this->params[$key] = $params[$key];
             };
         };
@@ -122,7 +121,7 @@ class siteparser
             $arIgnore = explode("\n", $this->params['IGNORE']);
             if (is_array($arIgnore)) {
                 foreach ($arIgnore as $ignorestr) {
-                    $ignorestr = '|'.str_replace('*', '.*', $ignorestr).'|';
+                    $ignorestr = '|' . str_replace('*', '.*', $ignorestr) . '|';
                     $this->params['IGNORE_preg'][] = $ignorestr;
                 };
             };
@@ -133,10 +132,10 @@ class siteparser
         if ($this->params['SKIP_FILES'] == 'Y') {
             $this->params['IGNORE_preg'][] = '|.*\.(doc|docx|xls|xlsx|pdf|zip|)|';
         };
-
     }
 
-    function load_params() {
+    function load_params()
+    {
         $query = 'SELECT * FROM params';
         $res = $this->DB->query($query);
         while ($row = $res->fetchArray()) {
@@ -146,11 +145,12 @@ class siteparser
         };
     }
 
-    function save_params() {
+    function save_params()
+    {
         $query = 'DELETE FROM params;';
         $query .= 'INSERT INTO params (setting, value) VALUES ';
-        foreach ($this->params as $key=>$val) {
-            $query .= '("'.$key.'" , "'.$val.'" ),';
+        foreach ($this->params as $key => $val) {
+            $query .= '("' . $key . '" , "' . $val . '" ),';
         }
         $this->DB->query($query);
     }
@@ -183,16 +183,16 @@ class siteparser
 
             if ($res['error'] != '') {
                 $this->add_error($id, $res['error'], 'SCAN', '5');
-                echo 'ERROR - '.$res['error'];
+                echo 'ERROR - ' . $res['error'];
             } else {
 
                 $query = 'INSERT INTO info (id_page, section, key, value) VALUES ';
-                $query .= '(' . $id . ', "HEADER", "response_code", "'.$res['info']['http_code'].'"),';
-                foreach ($res['info'] as $key=>$value) {
+                $query .= '(' . $id . ', "HEADER", "response_code", "' . $res['info']['http_code'] . '"),';
+                foreach ($res['info'] as $key => $value) {
                     if (is_array($value)) {
                         $value = print_r($value, true);
                     };
-                    $query .= '(' . $id . ', "HEADER", "'.$key.'", "'.$value.'"),';
+                    $query .= '(' . $id . ', "HEADER", "' . $key . '", "' . $value . '"),';
                 };
 
                 $this->DB->query(trim($query, ','));
@@ -214,21 +214,21 @@ class siteparser
                     };
                     if ($url == $this->site . '/robots.txt') {
                         if ($this->params['SKIP_ROBOTS'] != 'Y') {
-                            $this->add_error($id, $url.' response code not 200', 'SCAN', '10');
+                            $this->add_error($id, $url . ' response code not 200', 'SCAN', '10');
                         };
                     };
                     if ($url == $this->site . '/sitemap.xml') {
                         if ($this->params['SKIP_SITEMAP'] != 'Y') {
-                            $this->add_error($id, $url.' response code not 200', 'SCAN', '10');
+                            $this->add_error($id, $url . ' response code not 200', 'SCAN', '10');
                         };
                     };
                 };
 
                 if ($res['info']['redirect_url'] != '') {
-                    echo ' REDIRECT TO '.$res['info']['redirect_url'];
+                    echo ' REDIRECT TO ' . $res['info']['redirect_url'];
                     if ($this->params['SKIP_REDIRECT_URLS'] != 'Y') {
                         $this->add_url($res['info']['redirect_url']);
-                        $this->add_error($id, $url.' REDIRECT TO '.$res['info']['redirect_url'], 'SCAN', '5');
+                        $this->add_error($id, $url . ' REDIRECT TO ' . $res['info']['redirect_url'], 'SCAN', '5');
                     };
                 };
 
@@ -264,10 +264,7 @@ class siteparser
                     if (strpos($res['info']['content_type'], 'image') !== false) {
                         echo ' IMAGE ';
                     };
-
                 };
-
-
             };
             echo '</p>';
             $count_pages++;
@@ -290,7 +287,7 @@ class siteparser
                     if (is_array($agent['host'])) {
                         foreach ($agent['host'] as $host) {
                             if ($host != $this->site) {
-                                $this->add_error($id, 'HOST is NOT '.$this->site, 'ROBOTS', '7');
+                                $this->add_error($id, 'HOST is NOT ' . $this->site, 'ROBOTS', '7');
                             };
                         };
                     };
@@ -299,7 +296,7 @@ class siteparser
                             foreach ($agent['sitemap'] as $url) {
                                 $preurl = $this->prepare_url($url);
                                 if ($preurl != $url) {
-                                    $this->add_error($id, 'SITEMAP '.$url.' NOT '.$preurl, 'ROBOTS', '7');
+                                    $this->add_error($id, 'SITEMAP ' . $url . ' NOT ' . $preurl, 'ROBOTS', '7');
                                 };
                                 $id_page = $this->add_url($url);
                                 $this->add_source_page($id_page, $id);
@@ -316,25 +313,25 @@ class siteparser
         $sitemap_parser = new CSitemapParser();
         $parsed = $sitemap_parser->parse($content);
         if (is_array($parsed['ERROR'])) {
-            foreach($parsed['ERROR'] as $error) {
+            foreach ($parsed['ERROR'] as $error) {
                 $this->add_error($id, $error, 'SITEMAP', '8');
             };
         };
         if (is_array($parsed['sitemap'])) {
-            foreach($parsed['sitemap'] as $url) {
+            foreach ($parsed['sitemap'] as $url) {
                 $preurl = $this->prepare_url($url);
                 if ($preurl != $url) {
-                    $this->add_error($id, 'BAD url "'.$url.'"', 'SITEMAP', '8');
+                    $this->add_error($id, 'BAD url "' . $url . '"', 'SITEMAP', '8');
                 };
                 $id_page = $this->add_url($url);
                 $this->add_source_page($id_page, $id);
             };
         };
         if (is_array($parsed['url'])) {
-            foreach($parsed['url'] as $url) {
+            foreach ($parsed['url'] as $url) {
                 $preurl = $this->prepare_url($url);
                 if ($preurl != $url) {
-                    $this->add_error($id, 'BAD url "'.$url.'"', 'SITEMAP', '8');
+                    $this->add_error($id, 'BAD url "' . $url . '"', 'SITEMAP', '8');
                 };
                 $id_page = $this->add_url($url);
                 $this->add_source_page($id_page, $id);
@@ -350,7 +347,8 @@ class siteparser
         $query = 'INSERT INTO info (id_page, section, key, value) VALUES ';
         if (is_array($parsed['title'])) {
             foreach ($parsed['title'] as $title) {
-                $query .= '(' . $id . ', "HEAD", "title", "'.$title['text'].'"),';
+                $title['text'] = $this->DB->escapeString($title['text']);
+                $query .= '(' . $id . ', "HEAD", "title", "' . $title['text'] . '"),';
             };
         };
 
@@ -375,7 +373,9 @@ class siteparser
                     $content = $meta['content'];
                 };
                 if (($name != '') && ($content != '')) {
-                    $query .= '(' . $id . ', "META", "'.$name.'", "'.$content.'"),';
+                    $name = $this->DB->escapeString($name);
+                    $content = $this->DB->escapeString($content);
+                    $query .= '(' . $id . ', "META", "' . $name . '", "' . $content . '"),';
                 };
             };
         };
@@ -394,7 +394,9 @@ class siteparser
                     $content = $link['href'];
                 };
                 if (($name != '') && ($content != '')) {
-                    $query .= '(' . $id . ', "LINK", "'.$name.'", "'.$content.'"),';
+                    $name = $this->DB->escapeString($name);
+                    $content = $this->DB->escapeString($content);
+                    $query .= '(' . $id . ', "LINK", "' . $name . '", "' . $content . '"),';
                 };
             };
         };
@@ -404,7 +406,8 @@ class siteparser
             if (is_array($parsed['h' . $h])) {
                 foreach ($parsed['h' . $h] as $hcontent) {
                     if ($hcontent['text'] != '') {
-                        $query .= '(' . $id . ', "TAG", "H' . $h.'", "'.$hcontent['text'].'"),';
+                        $hcontent['text'] = $this->DB->escapeString($hcontent['text']);
+                        $query .= '(' . $id . ', "TAG", "H' . $h . '", "' . $hcontent['text'] . '"),';
                     }
                 }
             };
@@ -412,7 +415,9 @@ class siteparser
         };
         if (is_array($parsed['a'])) {
             foreach ($parsed['a'] as $link) {
-                $query .= '(' . $id . ', "LINKS", "'.$link['href'].'", "'.$link['text'].'"),';
+                $link['href'] = $this->DB->escapeString($link['href']);
+                $link['text'] = $this->DB->escapeString($link['text']);
+                $query .= '(' . $id . ', "LINKS", "' . $link['href'] . '", "' . $link['text'] . '"),';
                 $id_page = $this->add_url($link['href']);
                 $this->add_source_page($id_page, $id);
             };
@@ -425,7 +430,13 @@ class siteparser
                 $query = 'INSERT INTO image (id_page, src, datasrc, srcset, datasrcset, alt, title) VALUES';
                 $arSrc = ['src', 'data-src', 'srcset', 'data-srcset'];
                 foreach ($parsed['images'] as $img) {
-                    $query .= '('.$id.', "'.$img['src'].'",  "'.$img['data-src'].'", "'.$img['srcset'].'", "'.$img['data-srcset'].'", "'.$img['alt'].'", "'.$img['title'].'"),';
+                    $img['src'] = $this->DB->escapeString($img['src']);
+                    $img['data-src'] = $this->DB->escapeString($img['data-src']);
+                    $img['srcset'] = $this->DB->escapeString($img['srcset']);
+                    $img['data-srcset'] = $this->DB->escapeString($img['data-srcset']);
+                    $img['alt'] = $this->DB->escapeString($img['alt']);
+                    $img['title'] = $this->DB->escapeString($img['title']);
+                    $query .= '(' . $id . ', "' . $img['src'] . '",  "' . $img['data-src'] . '", "' . $img['srcset'] . '", "' . $img['data-srcset'] . '", "' . $img['alt'] . '", "' . $img['title'] . '"),';
                     foreach ($arSrc as $src) {
                         if ($img[$src] != '') {
                             $id_page = $this->add_url($img[$src]);
@@ -442,7 +453,11 @@ class siteparser
                 foreach ($parsed['images'] as $pic) {
                     if (is_array($pic['source'])) {
                         foreach ($pic['source'] as $img) {
-                            $query .= '('.$id.', "'.$img['src'].'",  "'.$img['data-src'].'", "'.$img['srcset'].'", "'.$img['data-srcset'].'"),';
+                            $img['src'] = $this->DB->escapeString($img['src']);
+                            $img['data-src'] = $this->DB->escapeString($img['data-src']);
+                            $img['srcset'] = $this->DB->escapeString($img['srcset']);
+                            $img['data-srcset'] = $this->DB->escapeString($img['data-srcset']);
+                            $query .= '(' . $id . ', "' . $img['src'] . '",  "' . $img['data-src'] . '", "' . $img['srcset'] . '", "' . $img['data-srcset'] . '"),';
                             foreach ($arSrc as $src) {
                                 if ($img[$src] != '') {
                                     $id_page = $this->add_url($img[$src]);
@@ -455,8 +470,6 @@ class siteparser
                 $this->DB->query(trim($query, ','));
             }
         };
-
-
     }
 
     function get_contents($url)
@@ -500,13 +513,19 @@ class siteparser
 
     function add_error($id_page, $errortext, $section = "", $level = "Low")
     {
-        $query = 'INSERT INTO errors (id_page, error, section, level) VALUES (
-            ' . $id_page . ',
-            "' . $errortext . '",
-            "' . $section . '",
-            "' . $level . '"
-        );';
-        $this->DB->query($query);
+        if (is_numeric($id_page)) {
+            $errortext = $this->DB->escapeString($errortext);
+            $section = $this->DB->escapeString($section);
+            $level = $this->DB->escapeString($level);
+
+            $query = 'INSERT INTO errors (id_page, error, section, level) VALUES (
+                ' . $id_page . ',
+                "' . $errortext . '",
+                "' . $section . '",
+                "' . $level . '"
+            );';
+            $this->DB->query($query);
+        }
     }
 
     function add_url($url)
@@ -552,9 +571,9 @@ class siteparser
     {
         if ((is_numeric($id_page)) && (is_numeric($id_page_source))) {
             $query = 'INSERT INTO source (id_page, id_page_source) VALUES';
-            $query .= '('.$id_page.', '.$id_page_source.')';
+            $query .= '(' . $id_page . ', ' . $id_page_source . ')';
+            $this->DB->query($query);
         }
-        $this->DB->query($query);
     }
 
     function report($type)
@@ -576,7 +595,7 @@ class siteparser
                 while ($row = $res->fetchArray()) {
                     $result .= '<tr>';
                     foreach ($row as $col) {
-                        $result .= '<td>'.$col.'</td>';
+                        $result .= '<td>' . $col . '</td>';
                     }
                     $result .= '</tr>';
                 }
@@ -592,7 +611,6 @@ class siteparser
         $query = 'SELECT * FROM url JOIN errors ON url.id = errors.id_page ORDER BY errors.level DESC';
         $result = $this->report_table($query);
         return $result;
-
     }
 
     function report_urls()

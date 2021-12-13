@@ -74,6 +74,7 @@ include('class/site.parser.class.php');
             if ($finish < $spider->count) {
                 $link = '?a=scan&site=' . $SITE . '&start=' . $finish . '&limit=' . $limit;
                 echo '<p><a href="' . $link . '">Далее</a></p>';
+                /*
                 echo '
                 <script>
                     setTimeout(function() {
@@ -81,6 +82,7 @@ include('class/site.parser.class.php');
                     }, 2000);
                 </script>
                 ';
+                */
             } else {
                 echo '<p>Готово</p>';
             };
