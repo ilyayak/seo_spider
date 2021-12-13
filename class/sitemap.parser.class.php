@@ -9,7 +9,7 @@ class CSitemapParser {
                 $result['sitemap'] = array();
                 foreach ($this->oXml->sitemap as $sitemap) {
                     if (isset($sitemap->loc)) {
-                        $result['sitemap'][] = $sitemap->loc;
+                        $result['sitemap'][] = strval($sitemap->loc);
                     }
                 }
             }
@@ -17,7 +17,7 @@ class CSitemapParser {
                 $result['url'] = array();
                 foreach ($this->oXml->url as $url) {
                     if (isset($url->loc)) {
-                        $result['url'][] = $url->loc;
+                        $result['url'][] = strval($url->loc);
                     }
                 }
             }
